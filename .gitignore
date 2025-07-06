@@ -5,8 +5,9 @@
 
 # 特定資料庫
 data/Aqi_His.sqlite
-utils/helper_api_related
-utils/helper_init
+utils/helper_api_related.R
+utils/helper_init.R
+
 
 # 測試或暫存輸出
 tests/
@@ -25,3 +26,4 @@ tmp/
 notebooks/
 docs/
 reports/
+rsconnect
