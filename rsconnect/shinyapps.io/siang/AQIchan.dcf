@@ -1,0 +1,12 @@
+name: AQIchan
+title: AQIchan
+username: siang
+account: siang
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 15031747
+bundleId: 10569404
+url: https://siang.shinyapps.io/AQIchan/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE

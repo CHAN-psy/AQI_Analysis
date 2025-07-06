@@ -1,0 +1,27 @@
+# 資料檔案
+*.csv
+*.rds
+*.rscignore
+
+# 特定資料庫
+data/Aqi_His.sqlite
+utils/helper_api_related
+utils/helper_init
+
+# 測試或暫存輸出
+tests/
+output/
+tmp/
+*.tmp
+*.log
+
+# 本機用的工作檔
+.Rhistory
+.RData
+.Rproj.user/
+.DS_Store
+
+# 不需要部署的輔助資料夾
+notebooks/
+docs/
+reports/
