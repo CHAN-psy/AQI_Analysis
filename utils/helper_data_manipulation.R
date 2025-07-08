@@ -255,12 +255,19 @@ compute_stats <- function(df) {
       outlier_n  = sum(aqi_value < (q1_aqi - 1.5*(q3_aqi-q1_aqi)) |
                          aqi_value > (q3_aqi + 1.5*(q3_aqi-q1_aqi))),
       outlier_pct= outlier_n/total_n*100,
-      bin        = create_bins(aqi_value)
+      bin_aqi        = create_bins(aqi_value),
+      bin_quality        = create_bins(quality)
     ) %>% 
-    group_by(sitename, pollutant, bin) %>% 
+    group_by(sitename, pollutant, bin_aqi) %>% 
     mutate(
-      bin_n     = n(),
-      bin_pct   = bin_n/total_n*100
+      bin_aqi_n     = n(),
+      bin_aqi_pct   = bin_aqi_n/total_n*100
+    ) %>% 
+    ungroup() %>%
+    group_by(sitename, pollutant, bin_quality) %>% 
+    mutate(
+      bin_quality_n     = n(),
+      bin_quality_pct   = bin_quality_n/total_n*100
     ) %>% 
     ungroup() 
 }
@@ -294,10 +301,16 @@ Trans_function <- function(raw_data) {
         "<b>平均：</b>", round(mean_aqi, 1),
         sep = ""
       ),
-      hover_freq = paste(
+      hover_freq_aqi = paste(
         "<b>站點：</b>", sitename, "<br>",
         "<b>污染物：</b>", pollutant, "<br>",
-        "<b>", sitename, "於[", bin, "]數量為：</b>", bin_n, " (", round(bin_pct, 1), "%)",
+        "<b>", sitename, "於[", bin_aqi, "]數量為：</b>", bin_aqi_n, " (", round(bin_aqi_pct, 1), "%)",
+        sep = ""
+      ),
+      hover_freq_quality = paste(
+        "<b>站點：</b>", sitename, "<br>",
+        "<b>污染物：</b>", pollutant, "<br>",
+        "<b>", sitename, "於[", bin_quality, "]數量為：</b>", bin_quality_n, " (", round(bin_quality_pct, 1), "%)",
         sep = ""
       ),
       hover_line = paste(

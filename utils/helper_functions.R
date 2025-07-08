@@ -25,47 +25,61 @@ tb_info <- "Aqi_Sta"
 
 #### 分析與視覺化 ####
 #定義折線圖繪製
-Line_Plotlty_ <- function(Raw_Data){
-
+  Line_Plotlty_ <- function(Raw_Data,arg = "aqi", arg2 = "aqi"){
+    
+    y_var <- if (arg == "aqi") "aqi_value" else "quality"
+    title <- if (arg == "aqi") "AQI副指標" else "濃度"
+    len = if(length(arg2) < 5) 1 else 2
+    
+    Raw_Data <- Raw_Data %>% 
+      select(sitename,pollutant,datacreationdate,y_var,hover_line) %>%
+      filter(pollutant %in% arg2) %>% 
+      group_split(pollutant)
+    
+    plot_list = purrr::imap(Raw_Data,function(data,idx){
+      titleY = data$pollutant %>% unlist %>% unique()
   
-  Raw_Data  <- Raw_Data  %>% 
-    group_split(pollutant,.keep = TRUE)
+      p <-  plot_ly(data, 
+                    x = ~datacreationdate, 
+                    y = data[[y_var]], 
+                    color = ~sitename,
+                    showlegend = idx==1,
+                    type = 'scatter', 
+                    mode = 'lines',
+                    customdata = ~sitename,
+                    hovertemplate = ~hover_line,
+                    legendgroup = ~sitename,
+                    name = ~sitename
+                    ) %>%
+        layout(
+          xaxis = list(title = "",
+                       tickfont = list(size = 10)),
+          yaxis = list(title = titleY,rangemode = 'tozero')
+        )
+      return(p)
+    }
+    )
   
-  plot_list = purrr::imap(Raw_Data,function(data,idx){
-    p <-  plot_ly(data, 
-                  x = ~datacreationdate, 
-                  y = ~aqi_value, 
-                  color = ~sitename,
-                  split = ~pollutant,
-                  showlegend = idx==1,
-                  type = 'scatter', 
-                  mode = 'lines',
-                  customdata = ~sitename,
-                  hovertemplate = ~hover_line,
-                  legendgroup = ~sitename,
-                  name = ~sitename
-                  ) %>%
+    p <- subplot(plot_list,nrows = len,shareX = FALSE, shareY = FALSE, titleY = TRUE, 
+                 margin = c(0.02,0.02,0.09,0.02)) %>%
       layout(
-        xaxis = list(title = ""),
-        yaxis = list(title = "",rangemode = 'tozero')
-      )
-    return(p)
+        title = list(
+          text = sprintf("各污染物的%s趨勢",title), # 您想要顯示的總標題文字
+          y = 0.99, # 標題的Y軸位置 (0到1，1為最頂部)
+          x = 0.5,  # 標題的X軸位置 (0到1，0.5為置中)
+          xanchor = 'center', # X軸錨點，設為center確保置中
+          yanchor = 'top'     # Y軸錨點，設為top確保標題文字從上方開始對齊
+        ),
+        showlegend = TRUE,
+        legend = list(
+        orientation = "h",   # 1. 將圖例設為水平排列
+        xanchor = "center",  # 2. 設定圖例的錨點為中心
+        x = 0.5,           # 3. 將錨點放置在 X 軸 50% 的位置 (正中央)
+        y = -0.2           # 4. 將圖例放置在繪圖區下方，避免遮擋
+      ))
+     return(p) 
+     
   }
-  )
-
-  p <- subplot(plot_list,nrows = 2,shareX = FALSE, shareY = FALSE,
-               margin = 0.05) %>%
-    layout(
-      showlegend = TRUE,
-      legend = list(
-      orientation = "h",   # 1. 將圖例設為水平排列
-      xanchor = "center",  # 2. 設定圖例的錨點為中心
-      x = 0.5,           # 3. 將錨點放置在 X 軸 50% 的位置 (正中央)
-      y = -0.2           # 4. 將圖例放置在繪圖區下方，避免遮擋
-    ))
-   return(p) 
-   
-}
 #定義add_heatmap熱力圖圖繪製
 Trace_Heat_Plotly = function(Raw_Data){
   # 2.2. 建立一個空的 plotly 物件作為畫布
@@ -161,12 +175,19 @@ Violin_Plotly_1 <- function(Raw_Data) {
     ) 
   return(p)
 }
-Violin_Plotly <- function(Raw_Data) {
+Violin_Plotly <- function(Raw_Data,arg = "aqi", arg2 = "aqi") {
   
-  p <- Raw_Data %>%
+  y_var <- if (arg == "aqi") "aqi_value" else "quality"
+  title <- if (arg == "aqi") "AQI副指標" else "濃度"
+  
+  Raw_Data <- Raw_Data %>% 
+    filter(pollutant %in% arg2)
+  
+  p <- 
     plot_ly(
+      data = Raw_Data,
       x = ~ pollutant,
-      y = ~ quality,
+      y = Raw_Data[[y_var]],
       color = ~ sitename,
       type = 'violin',
       points = "all",
@@ -176,6 +197,13 @@ Violin_Plotly <- function(Raw_Data) {
       hoverinfo = "text"
     )  %>%
     layout(
+      title = list(
+        text = sprintf("各污染物的%s趨勢",title), # 您想要顯示的總標題文字
+        y = 1, # 標題的Y軸位置 (0到1，1為最頂部)
+        x = 0.5,  # 標題的X軸位置 (0到1，0.5為置中)
+        xanchor = 'center', # X軸錨點，設為center確保置中
+        yanchor = 'top'     # Y軸錨點，設為top確保標題文字從上方開始對齊
+      ),
       xaxis = list(
         title = "污染物"
       ),
@@ -231,39 +259,59 @@ Radar_Plotlty <- function(Raw_Data) {
   return(p)
 }
 #定義頻率圖繪製
-Frequncy_Plotly = function(Raw_Data){
-  Raw_Data <- Raw_Data %>% select(sitename,pollutant,bin,bin_n,bin_pct,hover_freq) %>%
-    unique() %>% group_split(pollutant)
+Frequncy_Plotly = function(Raw_Data,arg = "aqi", arg2 = "aqi"){
+  
+  y_var <- if (arg == "aqi") "aqi" else "quality"
+  title <- if (arg == "aqi") "AQI副指標" else "濃度"
+  var_raw <- c(sprintf("bin_%s",y_var),
+               sprintf("bin_%s_n",y_var),
+               sprintf("hover_freq_%s",y_var))
+  len = if(length(arg2) < 5) 1 else 2
+  
+  Raw_Data <- Raw_Data %>% 
+    select(sitename,pollutant,all_of(var_raw)) %>%
+    unique() %>% filter(pollutant %in% arg2) %>% 
+    group_split(pollutant)
+  
 
   
   
   plot_list = purrr::imap(Raw_Data,function(data,idx){
+  titleY = data$pollutant %>% unlist %>% unique()
     
   p <- plot_ly(
     data = data,
     type = "bar",
-    x = ~bin,
-    y = ~bin_n ,
+    x = data[[var_raw[1]]],
+    y = data[[var_raw[2]]],
     color = ~sitename,
     split = ~pollutant,
     showlegend = (idx == 1),
     customdata = ~sitename,
-    hovertemplate  = ~hover_freq,
+    hovertemplate  = ~data[[var_raw[3]]],
     hoverinfo = 'skip',
     legendgroup = ~sitename,
     name = ~sitename
   )  %>% 
     layout(
-    xaxis = list(title = ""),
-    yaxis = list(title = "", zeroline = FALSE,
+    xaxis = list(title = "",
+                 tickfont = list(size = 10)),
+    yaxis = list(title = titleY, zeroline = FALSE,
                  rangemode = 'tozero'),
     barmode = "group",
     hovermode = 'closest'
   )
 })
-  p <- subplot(plot_list,nrows = 2,shareX = FALSE, shareY = FALSE,
-               margin = 0.05) %>%
+  p <- subplot(plot_list,nrows = len,shareX = FALSE, shareY = FALSE, titleY = TRUE,
+               margin = c(0.02,0.02,0.09,0.05)) %>%
       layout(
+        title = list(
+          text = sprintf("各污染物的%s趨勢",title), # 您想要顯示的總標題文字
+          y = 0.99, # 標題的Y軸位置 (0到1，1為最頂部)
+          x = 0.5,  # 標題的X軸位置 (0到1，0.5為置中)
+          xanchor = 'center', # X軸錨點，設為center確保置中
+          yanchor = 'top'     # Y軸錨點，設為top確保標題文字從上方開始對齊
+        ),
         showlegend = TRUE,
         legend = list(
                orientation = "h",   # 1. 將圖例設為水平排列

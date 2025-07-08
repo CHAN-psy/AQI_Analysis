@@ -2,6 +2,7 @@
 *.csv
 *.rds
 *.rscignore
+*.doc
 
 # 特定資料庫
 data/Aqi_His.sqlite

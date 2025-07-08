@@ -22,6 +22,14 @@ DashCard_plotly <- function(id, title = "預設標題") {
     )
   )
 }
+Dash_plotly <- function(id, title = "預設標題") {
+  ns <- NS(id)
+    shinycssloaders::withSpinner(
+      plotlyOutput(
+        ns("plot"),width = "100%", height = "650px")
+      )
+
+}
 DashInfoCard <- function(id, subtitle = "預設標題") {
   ns <- NS(id)
   bs4ValueBox(
@@ -37,14 +45,17 @@ ServerModule_plotly <-
            data,
            default_function,
            type ,
-           vals,
-           pol = NULL) {
+           vals) {
     moduleServer(id, function(input, output, session) {
       
       plot_obj <- reactive({
         df <- data()
         req(df)
-        default_function(df)
+        if(type == "other"){
+          default_function(df,vals$unit,vals$pollutants)
+        }else if(type == "map"){
+          default_function(df)
+        }
       })
       
       output$plot <- renderPlotly({
@@ -52,7 +63,6 @@ ServerModule_plotly <-
       })
       
       proxy = plotlyProxy("plot", session)
-      
       
       
       a <-  observeEvent(vals$click_site, {
@@ -190,6 +200,12 @@ ui <- bs4DashPage(
           title = "Highlight汙染物:",
           width = 12,
           collapsed = FALSE
+        ),
+        box(
+          uiOutput("UnitPanel"),
+          title = "單位轉換:",
+          width = 12,
+          collapsed = FALSE
         )
       )
     )
@@ -239,10 +255,11 @@ ui <- bs4DashPage(
             id = "tabbox",
             title = "趨勢圖",
             width = 12,
+            height = "700px",
             tabPanel(title = "折線圖",
-                     DashCard_plotly("Card2")),
+                     Dash_plotly("Card2")),
             tabPanel(title = "頻率圖",
-                     DashCard_plotly("Card3"))
+                     Dash_plotly("Card3"))
           )
         ),
         fluidRow(width = 12,
@@ -283,7 +300,9 @@ server <- function(input, output, session) {
     unlist(use.names = FALSE)
   
   vals = reactiveValues(click_site = c(),
-                        pollutants = NULL)
+                        pollutants = "aqi",
+                        date = NULL,
+                        unit = "aqi")
   
   
   #UI建立
@@ -298,8 +317,8 @@ server <- function(input, output, session) {
     )
   })
   output$DatePanel = renderUI({
-    #最早的日期是2018-01-01 00:00
-    min = "2018-01-01"
+    #最早的日期是2016-11-25 13:00
+    min = "2016-11-25"
     max = now() %>% format(., "%Y-%m-%d")
     start = (now() %m-% months(3)) %>% format(., "%Y-%m-%d")
     end  = now() %>% format(., "%Y-%m-%d")
@@ -319,12 +338,23 @@ server <- function(input, output, session) {
       inputId = "PollutantPanel",
       label = NULL,
       choices = name,
-      selected = all_of(name),
+      selected = "aqi",
+      multiple = TRUE,
+      options = list(plugins = list('remove_button'))
+    )
+  })
+  output$UnitPanel = renderUI({
+    name = c("AQI","濃度")
+    selectizeInput (
+      inputId = "UnitPanel",
+      label = NULL,
+      choices = name,
+      selected = "AQI",
       multiple = FALSE
     )
   })
   output$Accordion <- renderUI({
-    req(data, input$SitenamePanel)
+    req(data)
     site <- input$SitenamePanel
     # 為每個站點生成 tabPanel
     tab_panels <- purrr::map(site, function(x) {
@@ -337,7 +367,6 @@ server <- function(input, output, session) {
         "MainPollutant"
       )
       name_vector <- paste(x, item, sep = '_')
-      
       tabPanel(
         title = x,
         fluidRow(
@@ -361,6 +390,7 @@ server <- function(input, output, session) {
       tab_panels
     ))
   })
+  
   observe({
     output$ClickPanel = renderUI({
       req(input$SitenamePanel)
@@ -374,9 +404,15 @@ server <- function(input, output, session) {
       )
     })
   })
+  
   observeEvent(input$Submit, {
     req(data, input$SitenamePanel)
+    
+    vals$date <-  input$DatePanel
+    
     site <- input$SitenamePanel
+    date <-  vals$date
+    
     item <-
       c(
         "PM2_5_BiggerthanWHO_Day",
@@ -402,7 +438,7 @@ server <- function(input, output, session) {
                 "世界衛生組織建議的PM2.5標準為15μg/m³",
                 "環境部定義的PM10標準為75μg/m³",
                 "世界衛生組織建議的PM10標準為30μg/m³",
-                sprintf("%s~%s之間的AQI中位數",input$DatePanel[[1]],input$DatePanel[[2]]),
+                sprintf("%s~%s之間的AQI中位數",date[[1]],date[[2]]),
                 "通常決定該地區AQI指標的汙染物"
     )
     purrr::walk(site,
@@ -426,6 +462,7 @@ server <- function(input, output, session) {
                           color = "success"
                         )
                       })
+                    removeTooltip(id)
                     addTooltip(id = id,
                                options = list(
                                  title = tooltip,
@@ -433,8 +470,23 @@ server <- function(input, output, session) {
                                ))
                   })
                 })
-    
+    id = 1:4
+    tooltip = c("站位地理位置，點選站位可標註特定站位",
+                sprintf("%s~%s之間的副指標趨勢資訊",date[[1]],date[[2]]),
+                sprintf("%s~%s之間的副指標頻率資訊",date[[1]],date[[2]]),
+                sprintf("%s~%s之間的副指標數據分布",date[[1]],date[[2]]))
+    purrr::walk(id,
+                function(id){
+                  removeTooltip(paste0("Card",id,"-plot"))
+                  addTooltip(id = paste0("Card",id,"-plot"),
+                             options = list(
+                               title = tooltip[id],
+                               placement = "top"
+                             ))
+                })
   })
+  
+  
   observeEvent(input$SitenamePanel,{
     req(input$SitenamePanel)
     if(length(input$SitenamePanel) == 5){
@@ -443,6 +495,8 @@ server <- function(input, output, session) {
       removeTooltip("SitenamePanel")
     }
   })
+  
+  
   #圖片輸出
   ServerModule_plotly("Card1",
                       data,
@@ -464,23 +518,7 @@ server <- function(input, output, session) {
                       Violin_Plotly,
                       "other",
                       vals)
-  observe({
-    id = 1:4
-    lower = input$DatePanel[[1]] 
-    upper = input$DatePanel[[2]] 
-    tooltip = c("站位地理位置，點選站位可標註特定站位",
-                sprintf("%s~%s之間的副指標趨勢資訊",lower,upper),
-                sprintf("%s~%s之間的副指標頻率資訊",lower,upper),
-                sprintf("%s~%s之間的副指標數據分布",lower,upper))
-    purrr::walk(id,
-      function(id){
-      addTooltip(id = paste0("Card",id,"-plot"),
-                 options = list(
-                   title = tooltip[id],
-                   placement = "top"
-                 ))
-    })
-})
+
   addTooltip(id = "data_acc",
              options = list(
                title = "向資料庫取得站位與時間資料，透過GO!!!!!送出",
@@ -508,6 +546,7 @@ server <- function(input, output, session) {
     }
   }, ignoreNULL  = FALSE)
   
+  
   #更新Vals$click_site透過點選selectizeInput
   observeEvent(input$Highlightening, {
     if (!identical(sort(input$Highlightening), sort(vals$click_site))) {
@@ -518,6 +557,23 @@ server <- function(input, output, session) {
         input$Highlightening
     }
   }, ignoreNULL  = FALSE)
+  
+  observeEvent(input$UnitPanel, {
+    req(input$UnitPanel)
+    vals$unit = 
+      if(input$UnitPanel == "AQI"){
+        "aqi"
+      }else{
+        "quality"
+      }
+  }, ignoreNULL  = FALSE)
+  
+  observeEvent(input$PollutantPanel, {
+    req(input$PollutantPanel)
+    vals$pollutants = input$PollutantPanel
+  }, ignoreNULL  = FALSE)
+  
+  
 }
 
 # 執行應用
