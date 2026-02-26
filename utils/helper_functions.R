@@ -1,42 +1,37 @@
-#資料分析
-library(data.table)
-library(magrittr)
-library(dplyr)
-library(tidyr)
-library(dtplyr)
-library(lubridate)
-library(glue)
+# =============================================================================
+# utils/helper_functions.R
+# 視覺化繪圖函數
+# 套件載入統一由 app.R 處理
+# =============================================================================
 
-#視覺化
-library(ggplot2)
-library(plotly)
-
-#資料取得
-library(RSQLite)
-
-
-
-
-####資料庫相關函數####
-#資料庫參數
+# --- 資料庫參數 ---
 db_info <-"Aqi_Sta.sqlite"
 tb_info <- "Aqi_Sta"
 
 
-#### 分析與視覺化 ####
-#定義折線圖繪製
-  Line_Plotlty_ <- function(Raw_Data,arg = "aqi", arg2 = "aqi"){
+
+
+# =============================================================================
+# 視覺化繪圖函數
+# =============================================================================
+
+#'折線圖
+#'
+#' @param raw_data 資料框
+#' @param arg      單位："aqi"（副指標）或其他（濃度）
+#' @param arg2     要顯示的污染物向量
+line_plotly <- function(raw_data,arg = "aqi", arg2 = "aqi"){
     
     y_var <- if (arg == "aqi") "aqi_value" else "quality"
     title <- if (arg == "aqi") "AQI副指標" else "濃度"
     len = if(length(arg2) < 5) 1 else 2
     
-    Raw_Data <- Raw_Data %>% 
+    raw_data <- raw_data %>% 
       select(sitename,pollutant,datacreationdate,y_var,hover_line) %>%
       filter(pollutant %in% arg2) %>% 
       group_split(pollutant)
     
-    plot_list = purrr::imap(Raw_Data,function(data,idx){
+    plot_list = purrr::imap(raw_data,function(data,idx){
       titleY = data$pollutant %>% unlist %>% unique()
   
       p <-  plot_ly(data, 
@@ -81,13 +76,14 @@ tb_info <- "Aqi_Sta"
      
   }
 #定義add_heatmap熱力圖圖繪製
-Trace_Heat_Plotly = function(Raw_Data){
+#'熱力圖（add_heatmap 版本）
+trace_heat_plotly <- function(raw_data){
   # 2.2. 建立一個空的 plotly 物件作為畫布
-  Raw_Data <- Raw_Data %>%
+  raw_data <- raw_data %>%
     group_split(sitename)
   
   # 2. 為每個數據子集建立一個 plotly 圖表
-  plot_list <- purrr::map(Raw_Data, function(data) {
+  plot_list <- purrr::map(raw_data, function(data) {
     
     # 2.2. 建立一個空的 plotly 物件作為畫布
     p <- plot_ly(data = data) %>%
@@ -123,10 +119,10 @@ Trace_Heat_Plotly = function(Raw_Data){
   return(p_final)
 }
 #定義heatmap熱力圖圖繪製
-Heat_Plotlty_ <- function(Raw_Data){
-  Raw_Data  <- Raw_Data  %>% group_split(pollutant)
+heat_plotly <- function(raw_data){
+  raw_data  <- raw_data  %>% group_split(pollutant)
   
-  plot_list = purrr::map(Raw_Data,function(data){
+  plot_list = purrr::map(raw_data,function(data){
     name <- data$pollutant %>% unique() %>% as.character()
     p <-  plot_ly(data, 
                   x = ~datacreationdate, 
@@ -149,8 +145,9 @@ Heat_Plotlty_ <- function(Raw_Data){
   
 }
 #定義小提琴圖繪製
-Violin_Plotly_1 <- function(Raw_Data) {
-  p <- Raw_Data %>%
+#'小提琴圖（簡易版，不含單位切換）
+violin_plotly_simple <- function(raw_data) {
+  p <- raw_data %>%
     plot_ly(
       x = ~ pollutant,
       y = ~ quality,
@@ -175,19 +172,24 @@ Violin_Plotly_1 <- function(Raw_Data) {
     ) 
   return(p)
 }
-Violin_Plotly <- function(Raw_Data,arg = "aqi", arg2 = "aqi") {
+#'小提琴圖
+#'
+#' @param raw_data 資料框
+#' @param arg      單位
+#' @param arg2     污染物向量
+violin_plotly <- function(raw_data,arg = "aqi", arg2 = "aqi") {
   
   y_var <- if (arg == "aqi") "aqi_value" else "quality"
   title <- if (arg == "aqi") "AQI副指標" else "濃度"
   
-  Raw_Data <- Raw_Data %>% 
+  raw_data <- raw_data %>% 
     filter(pollutant %in% arg2)
   
   p <- 
     plot_ly(
-      data = Raw_Data,
+      data = raw_data,
       x = ~ pollutant,
-      y = Raw_Data[[y_var]],
+      y = raw_data[[y_var]],
       color = ~ sitename,
       type = 'violin',
       points = "all",
@@ -224,12 +226,13 @@ Violin_Plotly <- function(Raw_Data,arg = "aqi", arg2 = "aqi") {
   return(p)
 }
 #定義雷達圖繪製
-Radar_Plotlty <- function(Raw_Data) {
-  Raw_Data <- Raw_Data %>% filter(datacreationdate == min(datacreationdate) & pollutant != "aqi") %>%
+#'雷達圖
+radar_plotly <- function(raw_data) {
+  raw_data <- raw_data %>% filter(datacreationdate == min(datacreationdate) & pollutant != "aqi") %>%
     select(aqi_value,pollutant,sitename,description,pollutant_conc) %>%
     mutate(desc = paste0("<b>",pollutant,"於",sitename,"的數值為:</b><br>",pollutant_conc,"  (AQI=",aqi_value,")<br><br>",description))
   p <- plot_ly(
-    data = Raw_Data,
+    data = raw_data,
     type = 'scatterpolar',
     mode = "lines+markers",
     fill = 'toself',
@@ -244,10 +247,10 @@ Radar_Plotlty <- function(Raw_Data) {
         radialaxis = list(
           visible = TRUE,
           # 範圍最好根據數據動態調整
-          range = c(0, max(Raw_Data$quality, na.rm = TRUE) * 1.1)
+          range = c(0, max(raw_data$quality, na.rm = TRUE) * 1.1)
         )
       ),
-      title = paste("雷達圖 @", unique(Raw_Data$datacreationdate)),
+      title = paste("雷達圖 @", unique(raw_data$datacreationdate)),
       legend = list(
         orientation = "h",   # 1. 將圖例設為水平排列
         xanchor = "center",  # 2. 設定圖例的錨點為中心
@@ -259,7 +262,12 @@ Radar_Plotlty <- function(Raw_Data) {
   return(p)
 }
 #定義頻率圖繪製
-Frequncy_Plotly = function(Raw_Data,arg = "aqi", arg2 = "aqi"){
+#'頻率長條圖
+#'
+#' @param raw_data 資料框
+#' @param arg      單位
+#' @param arg2     污染物向量
+frequency_plotly <- function(raw_data,arg = "aqi", arg2 = "aqi"){
   
   y_var <- if (arg == "aqi") "aqi" else "quality"
   title <- if (arg == "aqi") "AQI副指標" else "濃度"
@@ -268,7 +276,7 @@ Frequncy_Plotly = function(Raw_Data,arg = "aqi", arg2 = "aqi"){
                sprintf("hover_freq_%s",y_var))
   len = if(length(arg2) < 5) 1 else 2
   
-  Raw_Data <- Raw_Data %>% 
+  raw_data <- raw_data %>% 
     select(sitename,pollutant,all_of(var_raw)) %>%
     unique() %>% filter(pollutant %in% arg2) %>% 
     group_split(pollutant)
@@ -276,7 +284,7 @@ Frequncy_Plotly = function(Raw_Data,arg = "aqi", arg2 = "aqi"){
 
   
   
-  plot_list = purrr::imap(Raw_Data,function(data,idx){
+  plot_list = purrr::imap(raw_data,function(data,idx){
   titleY = data$pollutant %>% unlist %>% unique()
     
   p <- plot_ly(
@@ -323,9 +331,10 @@ Frequncy_Plotly = function(Raw_Data,arg = "aqi", arg2 = "aqi"){
   return(p)
 }
 #定義地形圖繪製
-Topographic_Plotly = function(Raw_Data){
+#'地形圖（台灣地圖 + 站點標記）
+topographic_plotly <- function(raw_data){
   sf_data = sf::st_simplify(twmap::tw_county, dTolerance = 0.02)
-  map_bounds = calculate_map_bounds(Raw_Data)
+  map_bounds = calculate_map_bounds(raw_data)
   
   p <- plot_ly() %>%
     add_sf(
@@ -337,7 +346,7 @@ Topographic_Plotly = function(Raw_Data){
       hoverinfo = "skip"
     ) %>%
     add_markers(
-      data = Raw_Data,
+      data = raw_data,
       x = ~long,
       y = ~lati,
       customdata = ~sitename,
@@ -345,6 +354,7 @@ Topographic_Plotly = function(Raw_Data){
       marker = list(size = 15, line = list(width = 1, color = "white")),
       text = ~paste0("站點: ", sitename)
     ) %>%
+    event_register("plotly_click") %>%
     layout(
       xaxis = list(range = c(map_bounds[[2]], map_bounds[[1]]), showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
       yaxis = list(range = c(map_bounds[[4]], map_bounds[[3]]), showgrid = FALSE, showticklabels = FALSE, zeroline = FALSE),
@@ -361,6 +371,7 @@ Topographic_Plotly = function(Raw_Data){
     ) 
   return(p)
 }
+#'計算地圖邊界（供 topographic_plotly 與 server_module_plotly 使用）
 calculate_map_bounds <- function(site_data, target_ratio = 1/2.7) {
   if (nrow(site_data) == 1) {
     buffer <- 0.05
@@ -391,4 +402,3 @@ calculate_map_bounds <- function(site_data, target_ratio = 1/2.7) {
   return(list(xmax = temp_bounds[1], xmin = temp_bounds[2], 
               ymax = temp_bounds[3], ymin = temp_bounds[4]))
 }
-#AQI轉換
