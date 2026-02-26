@@ -13,11 +13,11 @@ library(RSQLite)
 purrr::walk(list.files("utils", pattern = "\\.R$", full.names = TRUE), source)
 
 # Module（必須在 ui.R 之前）
-source("R/modules/plotly_module.R")
+source("main/modules/plotly_module.R")
 
 # UI & Server
-source("R/ui.R")
-source("R/server.R")
+source("main/ui.R")
+source("main/server.R")
 
 options(shiny.reactlog = TRUE)
 shinyApp(ui, server)
