@@ -1,4 +1,4 @@
-Open_Database_ <-  function(db_info){
+open_database <-  function(db_info){
   conn <- NULL
   
   #try-catch
@@ -16,7 +16,7 @@ Open_Database_ <-  function(db_info){
   
   return(conn)
 }
-Close_Database_ <-  function(conn){
+close_database <-  function(conn){
   if(!is.null(conn) && DBI::dbIsValid(conn)){
     tryCatch({
       DBI::dbDisconnect(conn)
@@ -26,7 +26,7 @@ Close_Database_ <-  function(conn){
     })
   }
 }
-Get_Value <- function(db_info, condition = list("",NA,NA)){
+get_value <- function(db_info, condition = list("",NA,NA)){
   db = Open_Database_(db_info)
   on.exit({
     Close_Database_(db)
@@ -274,7 +274,7 @@ compute_stats <- function(df) {
 
 #— 2. 主函式：將以上模組串起來 —#
 
-Trans_function <- function(raw_data) {
+trans_function <- function(raw_data) {
   raw_data %>%
     compute_stats %>% 
     left_join(
@@ -322,7 +322,7 @@ Trans_function <- function(raw_data) {
     ) %>%
     as.data.frame()
 }
-Trans_to_valuebox <- function(currentsitename,raw_data){
+trans_to_valuebox <- function(currentsitename,raw_data){
   #要輸出這些東西 c("世衛超標天數","台規超標天數","小時中位數","主要汙染物")
   
   hourmedium <- raw_data %>% 
